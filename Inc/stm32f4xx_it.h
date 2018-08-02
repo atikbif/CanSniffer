@@ -54,8 +54,11 @@ void BusFault_Handler(void);
 void UsageFault_Handler(void);
 void DebugMon_Handler(void);
 void SysTick_Handler(void);
+void CAN1_RX0_IRQHandler(void);
+void CAN1_RX1_IRQHandler(void);
 void TIM1_UP_TIM10_IRQHandler(void);
 void ETH_IRQHandler(void);
+void CAN2_TX_IRQHandler(void);
 
 #ifdef __cplusplus
 }

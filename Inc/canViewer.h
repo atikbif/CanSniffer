@@ -8,7 +8,8 @@
 #ifndef CANVIEWER_H_
 #define CANVIEWER_H_
 
-void CanViewerTask(void const * argument);
+void canViewerTask(void const * argument);
+void initCANViewerFilter();
 
 
 #endif /* CANVIEWER_H_ */

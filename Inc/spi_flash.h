@@ -12,5 +12,6 @@
 
 unsigned char read_page(unsigned short pageNum, unsigned char *buf);
 unsigned char write_page(unsigned short pageNum, unsigned char *buf);
+void erase_chip();
 
 #endif /* SPI_FLASH_H_ */

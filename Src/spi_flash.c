@@ -19,6 +19,46 @@ extern SPI_HandleTypeDef hspi3;
 
 volatile unsigned char _Sys_SPI_Buzy=0;
 
+void erase_chip() {
+	unsigned char Data;
+	// ожидание завершения работы с Flash другими процессами
+	volatile portTickType startTick,currentTick;
+	startTick = xTaskGetTickCount();
+	while(_Sys_SPI_Buzy){currentTick = xTaskGetTickCount();if(currentTick - startTick>=WAIT_TIME_MS) return;osDelay(1);}
+	// захват Flash текущим процессом
+	portDISABLE_INTERRUPTS();
+	_Sys_SPI_Buzy=1;
+	portENABLE_INTERRUPTS();
+
+	// непосредственно чтение
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
+
+	Data = 0xC7;
+	HAL_SPI_Transmit(&hspi3, &Data, 1, 100);
+	Data = 0x94;
+	HAL_SPI_Transmit(&hspi3, &Data, 1, 100);
+	Data = 0x80;
+	HAL_SPI_Transmit(&hspi3, &Data, 1, 100);
+	Data = 0x9A;
+	HAL_SPI_Transmit(&hspi3, &Data, 1, 100);
+
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
+
+	do{
+		osDelay(1);
+		Data = 0xD7;
+		HAL_SPI_Transmit(&hspi3, &Data, 1, 100);
+		HAL_SPI_Receive(&hspi3,&Data,1,100);
+	}while((Data & 0x80)!=0x80);
+
+	// освобождение Flash
+	portDISABLE_INTERRUPTS();
+	_Sys_SPI_Buzy=0;
+	portENABLE_INTERRUPTS();
+}
+
 unsigned char read_page(unsigned short pageNum, unsigned char *buf) {
 	unsigned char Data;
 

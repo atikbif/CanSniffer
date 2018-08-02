@@ -57,6 +57,8 @@
 #include "spi_flash.h"
 #include "udp_echoserver.h"
 #include "canViewer.h"
+#include "canDebugMaster.h"
+#include "canLogger.h"
 
 /* USER CODE END Includes */
 
@@ -71,6 +73,10 @@ osThreadId spiTaskHandle;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+
+osThreadId canDebugTaskHandle;
+osThreadId canViewerTaskHandle;
+osThreadId canLoggerTaskHandle;
 
 unsigned short led_cnt=0;
 unsigned short led_limit = 2000;
@@ -133,6 +139,8 @@ int main(void)
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
 
+  initLogger();
+
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -153,10 +161,18 @@ int main(void)
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of spiTask */
-  osThreadDef(spiTask, SPISheduler, osPriorityIdle, 0, 256);
+  osThreadDef(spiTask, SPISheduler, osPriorityNormal, 0, 256);
   spiTaskHandle = osThreadCreate(osThread(spiTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
+  osThreadDef(canViewer, canViewerTask, osPriorityNormal, 0, 256);
+  canViewerTaskHandle = osThreadCreate(osThread(canViewer), NULL);
+
+  osThreadDef(canDebugger, canDebugTask, osPriorityNormal, 0, 256);
+  canDebugTaskHandle = osThreadCreate(osThread(canDebugger), NULL);
+
+  osThreadDef(canLog, canLoggerTask, osPriorityNormal, 0, 256);
+  canLoggerTaskHandle = osThreadCreate(osThread(canLog), NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
