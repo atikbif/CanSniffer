@@ -62,6 +62,7 @@ void canDebugTask(void const * argument) {
 
 		HAL_CAN_AddTxMessage(&hcan2, &TxHeader, TxData, &TxMailbox);
 		while(HAL_CAN_GetTxMailboxesFreeLevel(&hcan2) != 3) {osDelay(1);}
-		osDelay(20);
+		//osDelay(20);
+		osDelay(1);
 	}
 }

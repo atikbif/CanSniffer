@@ -10,10 +10,12 @@
 #include "cmsis_os.h"
 #include "stm32f4xx_hal.h"
 #include "canLogger.h"
+#include "crc.h"
 
 osThreadId canViewerTaskHandle;
 static CAN_RxHeaderTypeDef   RxHeader;
 static uint8_t               RxData[8];
+static unsigned char crc_buf[64];
 
 static struct logBuf* log;
 static unsigned short remainBytes = 528;
@@ -58,6 +60,7 @@ void initCANViewerFilter() {
 void canViewerTask(void const * argument) {
 	//unsigned short pageNum = 0;
 	unsigned short i=0;
+	unsigned char crc8;
 	initCANViewerFilter();
 	HAL_CAN_Start(&hcan1);
 
@@ -71,12 +74,15 @@ void canViewerTask(void const * argument) {
 				//while(writeByteToBuffer(0x02)==0) {osDelay(1);}
 				//while(writeByteToBuffer(0x03)==0) {osDelay(1);}
 				//while(writeByteToBuffer(0x04)==0) {osDelay(1);}
-				while(writeByteToBuffer(RxHeader.StdId >> 8)==0) {osDelay(1);}
-				while(writeByteToBuffer(RxHeader.StdId & 0xFF)==0) {osDelay(1);}
-				while(writeByteToBuffer(RxHeader.DLC & 0xFF)==0) {osDelay(1);}
+				crc_buf[0]=RxHeader.StdId >> 8;while(writeByteToBuffer(RxHeader.StdId >> 8)==0) {osDelay(1);}
+				crc_buf[1]=RxHeader.StdId & 0xFF;while(writeByteToBuffer(RxHeader.StdId & 0xFF)==0) {osDelay(1);}
+				crc_buf[2]=RxHeader.DLC & 0xFF;while(writeByteToBuffer(RxHeader.DLC & 0xFF)==0) {osDelay(1);}
 				for(i=0;i<RxHeader.DLC;i++) {
-					while(writeByteToBuffer(RxData[i])==0) {osDelay(1);}
+					crc_buf[3+i]=RxData[i];while(writeByteToBuffer(RxData[i])==0) {osDelay(1);}
 				}
+				crc8 = GetCRC8(crc_buf,3+RxHeader.DLC);
+				while(writeByteToBuffer(crc8)==0) {osDelay(1);}
+
 				//HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_9);
 				/*if((RxHeader.StdId == 0x02)                     &&
 				     (RxHeader.RTR == CAN_RTR_DATA)               &&
