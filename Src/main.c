@@ -165,7 +165,7 @@ int main(void)
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of spiTask */
-  osThreadDef(spiTask, SPISheduler, osPriorityIdle, 0, 256);
+  osThreadDef(spiTask, SPISheduler, osPriorityNormal, 0, 256);
   spiTaskHandle = osThreadCreate(osThread(spiTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -275,7 +275,7 @@ static void MX_CAN1_Init(void)
 
   hcan1.Instance = CAN1;
   hcan1.Init.Prescaler = 8;
-  hcan1.Init.Mode = CAN_MODE_NORMAL;
+  hcan1.Init.Mode = CAN_MODE_SILENT;
   hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan1.Init.TimeSeg1 = CAN_BS1_13TQ;
   hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
