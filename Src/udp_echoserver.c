@@ -51,7 +51,9 @@
 #include "spi_flash.h"
 #include "crc.h"
 
-#include <string.h>
+//#include <string.h>
+
+#include "stm32f4xx_hal.h"
 
 #define UDP_SERVER_PORT    7   /* define the UDP local connection port */
 #define PAGE_CNT		   8192
@@ -59,14 +61,67 @@
 #define INCORRECT_PAGE_NUM	1
 #define FRAM_IS_BUSY		2
 
+extern RTC_HandleTypeDef hrtc;
+
 static char answer[1024];
 static unsigned short pageNum = 0;
 static unsigned short reqID = 0;
 
+volatile uint8_t *UniqueID = (uint8_t *)0x1FFF7A10;
+
+static RTC_TimeTypeDef sTime;
+static RTC_DateTypeDef sDate;
+static unsigned long curTime;
+
+const uint16_t day_offset[12] = {0, 31, 61,92, 122, 153, 184, 214, 245, 275,306, 337};
+struct sDateTime
+{
+	uint8_t sec;
+	uint8_t min;
+	uint8_t hour;
+	uint8_t date;
+	uint8_t month;
+	uint8_t day;
+	int16_t year;
+} sdt;
 
 void udp_echoserver_receive_callback(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16_t port);
 void inline send_udp_data(struct udp_pcb *upcb,const ip_addr_t *addr,u16_t port,u16_t length);
 
+static unsigned long EncodeDateTime(struct sDateTime *dt)
+{
+	uint8_t a = dt->month < 3; // а = 1, если месяц январь или февраль
+	if((dt->year==2000)&&(a)) {
+		if(dt->month==1) return 86400*(dt->date-1) + (int)dt->hour * 3600 + (int)dt->min * 60 + dt->sec;
+		else return 86400*(dt->date-1) + (unsigned long)31*86400 + (int)dt->hour * 3600 + (int)dt->min * 60 + dt->sec;
+	}else {
+		int16_t y = dt->year - a - 2000;  // y = отнимаем от года 1, если а = 1, а так же 2000;
+		uint8_t m = dt->month + 12 * a - 3; // аналогия выражения (12 + month - 3) % 12; делаем март нулевым месяцем года.
+		return 5184000 + (dt->date - 1 + day_offset[m] + y * 365 + y / 4 - y / 100 + y / 400) * 86400 +
+			   (int)dt->hour * 3600 + (int)dt->min * 60 + dt->sec;
+	}
+}
+
+/*static void DecodeDateTime(uint32_t idt, sDateTime *dt)
+{
+    sDayTime day;
+    ldiv_t century, year_of_century;
+    uint32_t day_of_century, a, m;
+    DecodeDayTime(idt, &day);
+    dt->sec = day.Sec;
+    dt->min = day.Min;
+    dt->hour = day.Hour;
+    century = ldiv(day.Day * 4 + 3, 146097); // Вычисляем кол-во 100-летий
+    day_of_century = century.rem / 4; // Остаток дней в столетии
+    year_of_century = ldiv(day_of_century * 4 + 3, 1461); // Вычисляем кол-во лет в столетии
+    day_of_year = year_of_century.rem / 4; // Остаток дней в году
+    m = (5 * day_of_year + 2) / 153; // номер месяца, где март = 0, апрель = 1 и т.д.
+    dt->date = day_of_year + 1 - day_offset[m]; // находим день в месяце
+    a = m < 10;
+    dt->month = m + 3 - 12 * a; // вычисляем месяц в году
+    dt->year = 100 * century.quot + year_of_century.quot + 2000 + a; // вычисляем год
+    dt->day = (day.Day + 3) % 7; // вычисляем день недели
+}*/
 
 void udp_echoserver_init(void)
 {
@@ -100,6 +155,7 @@ void udp_echoserver_receive_callback(void *arg, struct udp_pcb *upcb, struct pbu
 
   unsigned char *data;
   unsigned short crc;
+  unsigned char i=0;
 
   data = (unsigned char*)(p->payload);
   crc = GetCRC16(data,p->len);
@@ -140,6 +196,52 @@ void udp_echoserver_receive_callback(void *arg, struct udp_pcb *upcb, struct pbu
 			  break;
 		  case 0xE0:
 			  break;
+		  case 0xD1:
+			  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+			  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+
+			  sdt.sec = sTime.Seconds;
+			  sdt.min = sTime.Minutes;
+			  sdt.hour = sTime.Hours;
+			  sdt.date = sDate.Date;
+			  sdt.day = sDate.WeekDay;
+			  sdt.month = sDate.Month;
+			  sdt.year = sDate.Year + 2000;
+			  curTime = EncodeDateTime(&sdt);
+
+			  // repeat request ID
+			  answer[0] = data[0];
+			  answer[1] = data[1];
+			  answer[2] = 0xD1;
+			  answer[3] = (curTime>>24)&0xFF;
+			  answer[4] = (curTime>>16)&0xFF;
+			  answer[5] = (curTime>>8)&0xFF;
+			  answer[6] = curTime & 0xFF;
+			  for(i=0;i<12;i++) answer[7+i] = UniqueID[i];
+			  answer[19] = 0x01; // version high
+			  answer[20] = 0x00; // version low
+
+			  crc = GetCRC16((unsigned char*)answer,7+12+2);
+			  answer[21]=crc>>8;
+			  answer[22]=crc&0xFF;
+			  send_udp_data(upcb, addr, port,23);
+			  break;
+		  case 0xE1:
+			  sTime.Seconds = data[3];
+			  sTime.Minutes = data[4];
+			  sTime.Hours = data[5];
+			  sDate.Date = data[6];
+			  sDate.Month = data[7];
+			  sDate.Year = data[8];
+			  HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+			  HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+			  answer[0] = data[0];
+			  answer[1] = data[1];
+			  answer[2] = 0xE1;
+			  crc = GetCRC16((unsigned char*)answer,3);
+			  answer[3]=crc>>8;
+			  answer[4]=crc&0xFF;
+			  send_udp_data(upcb, addr, port,5);
 	  }
   }
 
