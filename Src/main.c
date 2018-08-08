@@ -59,6 +59,7 @@
 #include "canViewer.h"
 #include "canDebugMaster.h"
 #include "canLogger.h"
+#include "datetime.h"
 
 /* USER CODE END Includes */
 
@@ -79,12 +80,13 @@ osThreadId spiTaskHandle;
 osThreadId canDebugTaskHandle;
 osThreadId canViewerTaskHandle;
 osThreadId canLoggerTaskHandle;
+osThreadId datetimeTaskHandle;
 
 unsigned short led_cnt=0;
 unsigned short led_limit = 2000;
 
 unsigned char fl_buf[528];
-unsigned short pageNum=0;
+unsigned short pageNumber=0;
 unsigned short buf_cnt=0;
 
 /* USER CODE END PV */
@@ -177,6 +179,9 @@ int main(void)
 
   osThreadDef(canLog, canLoggerTask, osPriorityNormal, 0, 256);
   canLoggerTaskHandle = osThreadCreate(osThread(canLog), NULL);
+
+  osThreadDef(dateTime, datetimeTask, osPriorityNormal, 0, 256);
+  datetimeTaskHandle = osThreadCreate(osThread(dateTime), NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -347,23 +352,27 @@ static void MX_RTC_Init(void)
 
   HAL_RTCEx_EnableBypassShadow(&hrtc);
 
-  if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) != 0x32F2)
+  if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) != 0x32F3)
   {
-	  sTime.Hours = 0;
-		sTime.Minutes = 00;
-		sTime.Seconds = 0;
-		sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-		sTime.StoreOperation = RTC_STOREOPERATION_RESET;
-		HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+	sTime.Hours = 0;
+	sTime.Minutes = 00;
+	sTime.Seconds = 0;
+	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+	sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+	HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 
-		//sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-		sDate.Month = 1;
-		sDate.Date = 1;
-		sDate.Year = 00;
+	//sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+	sDate.Month = 1;
+	sDate.Date = 1;
+	sDate.Year = 00;
 
-		HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-	  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0x32F2);
+	HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0x32F3);
+	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, 0);
   }
+
+  pageNumber = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);
+  if(pageNumber>=8192) pageNumber = 0;
 
   /* USER CODE END RTC_Init 2 */
 

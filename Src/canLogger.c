@@ -3,7 +3,8 @@
 #include "spi_flash.h"
 #include "stm32f4xx_hal.h"
 
-static unsigned short pageNum = 0;
+extern unsigned short pageNumber;
+extern RTC_HandleTypeDef hrtc;
 
 void initLogger() {
 	int i = 0;
@@ -31,8 +32,9 @@ void canLoggerTask(void const * argument) {
 	{
 		for(i=0;i<LOG_CNT;i++) {
 			if(logs[i].fillFlag) {
-				write_page(pageNum,logs[i].buf);
-				pageNum++;if(pageNum>=8192) pageNum=0;
+				write_page(pageNumber,logs[i].buf);
+				pageNumber++;if(pageNumber>=8192) pageNumber=0;
+				HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, pageNumber);
 				logs[i].fillFlag = 0;
 				HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_9);
 				osDelay(1);

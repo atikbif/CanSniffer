@@ -11,15 +11,18 @@
 #include "stm32f4xx_hal.h"
 #include "canLogger.h"
 #include "crc.h"
+#include "datetime.h"
 
 osThreadId canViewerTaskHandle;
 static CAN_RxHeaderTypeDef   RxHeader;
 static uint8_t               RxData[8];
 static unsigned char crc_buf[64];
+static unsigned char timeFlag = 1;
+static unsigned long extTime = 0;
 
 static struct logBuf* log;
 static unsigned short remainBytes = 528;
-//static unsigned char fl_buf[528];
+extern unsigned long cTime;
 
 extern CAN_HandleTypeDef hcan1;
 
@@ -28,6 +31,7 @@ static inline unsigned char writeByteToBuffer(unsigned char value) {
 		log->buf[528-remainBytes] = value;
 	}else {
 		if(log->next->fillFlag==0) {
+			timeFlag=1;
 			log->fillFlag = 1;
 			log = log->next;
 			remainBytes = 528;
@@ -69,6 +73,13 @@ void canViewerTask(void const * argument) {
 	{
 		if(HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0)) {
 			if(HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK) {
+				if(((RxData[0] & 0x1F)==0x1F)&&(RxData[1]==0x0E)&&(RxHeader.DLC==6)) {
+					extTime = RxData[5];
+					extTime<<=8;extTime|=RxData[4];
+					extTime<<=8;extTime|=RxData[3];
+					extTime<<=8;extTime|=RxData[2];
+					//updateCurrentTime(extTime);
+				}
 				while(writeByteToBuffer(0x31)==0) {osDelay(1);}
 				//while(writeByteToBuffer(0x01)==0) {osDelay(1);}
 				//while(writeByteToBuffer(0x02)==0) {osDelay(1);}
@@ -76,11 +87,17 @@ void canViewerTask(void const * argument) {
 				//while(writeByteToBuffer(0x04)==0) {osDelay(1);}
 				crc_buf[0]=RxHeader.StdId >> 8;while(writeByteToBuffer(RxHeader.StdId >> 8)==0) {osDelay(1);}
 				crc_buf[1]=RxHeader.StdId & 0xFF;while(writeByteToBuffer(RxHeader.StdId & 0xFF)==0) {osDelay(1);}
-				crc_buf[2]=RxHeader.DLC & 0xFF;while(writeByteToBuffer(RxHeader.DLC & 0xFF)==0) {osDelay(1);}
+
+				crc_buf[2]=(cTime >> 24) & 0xFF;while(writeByteToBuffer((cTime >> 24) & 0xFF)==0) {osDelay(1);}
+				crc_buf[3]=(cTime >> 16) & 0xFF;while(writeByteToBuffer((cTime >> 16) & 0xFF)==0) {osDelay(1);}
+				crc_buf[4]=(cTime >> 8) & 0xFF;while(writeByteToBuffer((cTime >> 8) & 0xFF)==0) {osDelay(1);}
+				crc_buf[5]=cTime & 0xFF;while(writeByteToBuffer(cTime & 0xFF)==0) {osDelay(1);}
+
+				crc_buf[6]=RxHeader.DLC & 0xFF;while(writeByteToBuffer(RxHeader.DLC & 0xFF)==0) {osDelay(1);}
 				for(i=0;i<RxHeader.DLC;i++) {
-					crc_buf[3+i]=RxData[i];while(writeByteToBuffer(RxData[i])==0) {osDelay(1);}
+					crc_buf[7+i]=RxData[i];while(writeByteToBuffer(RxData[i])==0) {osDelay(1);}
 				}
-				crc8 = GetCRC8(crc_buf,3+RxHeader.DLC);
+				crc8 = GetCRC8(crc_buf,7+RxHeader.DLC);
 				while(writeByteToBuffer(crc8)==0) {osDelay(1);}
 
 				//HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_9);
