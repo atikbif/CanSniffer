@@ -56,7 +56,7 @@ void canDebugTask(void const * argument) {
 	for(;;)
 	{
 		timeCnt++;
-		if(timeCnt>=5000) {
+		if(timeCnt>=20000) {
 			//HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_9);
 			timeCnt = 0;
 			TxHeader.StdId = 0x0439;

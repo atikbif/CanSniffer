@@ -60,6 +60,7 @@
 #include "canDebugMaster.h"
 #include "canLogger.h"
 #include "datetime.h"
+#include "flash_if.h"
 
 /* USER CODE END Includes */
 
@@ -144,6 +145,10 @@ int main(void)
   MX_CAN2_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+
+  FLASH_If_Init();
+  HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, 0x8010000,  0x01020304);
+
   if(!(*(volatile uint32_t *) (BDCR_RTCEN_BB)))__HAL_RCC_RTC_ENABLE();
   initLogger();
 

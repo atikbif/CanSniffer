@@ -50,6 +50,7 @@
 #include "udp_echoserver.h"
 #include "spi_flash.h"
 #include "crc.h"
+#include "flash_if.h"
 
 //#include <string.h>
 
@@ -164,6 +165,40 @@ void udp_echoserver_receive_callback(void *arg, struct udp_pcb *upcb, struct pbu
 	  reqID = (unsigned short)data[0]<<8;
 	  reqID |= data[1];
 	  switch(data[2]){
+	  	  case 0xA0:
+			  answer[0] = 0x01;	// type of device identificator
+			  answer[1] = 0xAD;
+			  answer[2] = 0x54;
+			  answer[3] = 0x98;
+			  crc = GetCRC16((unsigned char*)answer,4);
+			  answer[4]=crc>>8;
+			  answer[5]=crc&0xFF;
+			  send_udp_data(upcb, addr, port,6);
+			  break;
+		  case 0xE8:
+			  if((data[3]==4)&&(FLASH_If_Erase_One_Sector(data[3]))) { // correct sector erase
+				  answer[0] = data[0];
+				  answer[1] = data[1];
+				  answer[2] = 0xE1;
+				  answer[3] = 0x01;
+				  crc = GetCRC16((unsigned char*)answer,4);
+				  answer[4]=crc>>8;
+				  answer[5]=crc&0xFF;
+				  send_udp_data(upcb, addr, port,6);
+			  }else {
+				  answer[0] = data[0];
+				  answer[1] = data[1];
+				  answer[2] = 0xE1;
+				  answer[3] = 0x00;
+				  crc = GetCRC16((unsigned char*)answer,4);
+				  answer[4]=crc>>8;
+				  answer[5]=crc&0xFF;
+				  send_udp_data(upcb, addr, port,6);
+			  }
+			  break;
+		  case 0xEF:
+			  SCB->AIRCR = 0x05FA0004;
+			  break;
 		  case 0xD0:
 			  pageNum = (unsigned short)data[3]<<8;
 			  pageNum |= data[4];

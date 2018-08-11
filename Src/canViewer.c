@@ -78,7 +78,7 @@ void canViewerTask(void const * argument) {
 					extTime<<=8;extTime|=RxData[4];
 					extTime<<=8;extTime|=RxData[3];
 					extTime<<=8;extTime|=RxData[2];
-					//updateCurrentTime(extTime);
+					updateCurrentTime(extTime);
 				}
 				while(writeByteToBuffer(0x31)==0) {osDelay(1);}
 				//while(writeByteToBuffer(0x01)==0) {osDelay(1);}
